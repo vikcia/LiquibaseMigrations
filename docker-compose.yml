@@ -1,0 +1,42 @@
+version: '3.4'
+
+services:
+  liquibasemigrations:
+    image: ${DOCKER_REGISTRY-}liquibasemigrations
+    build:
+      context: .
+      dockerfile: LiquibaseMigrations/Dockerfile
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: market
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5437:5432"
+    networks:
+      - my_shared_network
+
+  liquibase:
+    image: liquibase/liquibase
+    volumes:
+      - ./migration:/liquibase/migration
+    environment:
+      - DATABASE_URL=jdbc:postgresql://db:5432/market
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=password
+    command:
+      - --changeLogFile=/migration/dbchangelog.yaml     
+      - --url=jdbc:postgresql://db:5432/market
+      - --username=postgres
+      - --password=password
+      - update
+    ports:
+      - "8080:8080"
+    networks:
+      - my_shared_network
+
+networks:
+  my_shared_network:
+    external: true

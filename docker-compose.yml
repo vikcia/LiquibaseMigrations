@@ -2,12 +2,19 @@ version: '3.4'
 
 services:
   liquibasemigrations:
+    container_name: LiquibasemigrationsLibrary
     image: ${DOCKER_REGISTRY-}liquibasemigrations
     build:
       context: .
       dockerfile: LiquibaseMigrations/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - my_shared_network_market
 
   db:
+    container_name: PostgreDB
     image: postgres:latest
     environment:
       POSTGRES_DB: market
@@ -16,9 +23,16 @@ services:
     ports:
       - "5437:5432"
     networks:
-      - my_shared_network
+      - my_shared_network_market
+# healtcheck for liquibase
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   liquibase:
+    container_name: Liquibasemigrations
     image: liquibase/liquibase
     volumes:
       - ./migration:/liquibase/migration
@@ -26,17 +40,20 @@ services:
       - DATABASE_URL=jdbc:postgresql://db:5432/market
       - DATABASE_USERNAME=postgres
       - DATABASE_PASSWORD=password
-    command:
-      - --changeLogFile=/migration/dbchangelog.yaml     
-      - --url=jdbc:postgresql://db:5432/market
-      - --username=postgres
-      - --password=password
-      - update
+    command: >
+      --changeLogFile=/migration/dbchangelog.yaml
+      --url=jdbc:postgresql://db:5432/market
+      --username=postgres
+      --password=password
+      update
     ports:
       - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
-      - my_shared_network
+      - my_shared_network_market
 
 networks:
-  my_shared_network:
-    external: true
+  my_shared_network_market:
+    name: my_shared_network_market
